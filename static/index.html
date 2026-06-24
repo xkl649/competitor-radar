@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>竞品雷达 v1.0 — INIU 充电品类全球竞品监测</title>
+<script src="/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+    --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+    --blue: #3b82f6; --blue-bg: #1e3a5f;
+    --green: #10b981; --green-bg: #064e3b;
+    --red: #ef4444; --red-bg: #7f1d1d;
+    --amber: #f59e0b; --amber-bg: #78350f;
+    --purple: #8b5cf6; --purple-bg: #4c1d95;
+    --cyan: #06b6d4; --cyan-bg: #164e63;
+    --border: #334155;
+    --radius: 10px; --radius-sm: 6px;
+    --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; line-height:1.55; font-size:14px; }
+
+  /* 顶部导航 */
+  .topbar { background:var(--bg2); border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; gap:24px; position:sticky; top:0; z-index:100; }
+  .logo { font-weight:800; font-size:18px; background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .topbar .badge { background:var(--blue-bg); color:var(--blue); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+
+  .topbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .btn { padding:7px 16px; border-radius:var(--radius-sm); border:none; cursor:pointer; font-size:13px; font-weight:500; transition:all 0.15s; }
+  .btn-primary { background:var(--blue); color:#fff; }
+  .btn-primary:hover { background:#2563eb; }
+  .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text2); }
+  .btn-outline:hover { background:var(--bg3); color:var(--text); }
+  .btn-sm { padding:4px 10px; font-size:11px; }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-amber { background:var(--amber); color:#000; }
+
+  /* 主布局 */
+  .layout { display:flex; min-height:calc(100vh - 56px); }
+  .sidebar { width:220px; background:var(--bg2); border-right:1px solid var(--border); padding:16px 0; flex-shrink:0; }
+  .sidebar-nav { padding:0 12px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:var(--radius-sm); cursor:pointer; color:var(--text2); font-size:13px; margin-bottom:2px; transition:all 0.12s; }
+  .nav-item:hover { background:var(--bg3); color:var(--text); }
+  .nav-item.active { background:var(--blue-bg); color:var(--blue); font-weight:600; }
+  .nav-item .dot { width:8px; height:8px; border-radius:50%; }
+  .nav-item .count { margin-left:auto; font-size:11px; color:var(--text3); }
+
+  .main { flex:1; padding:24px; overflow-y:auto; max-height:calc(100vh - 56px); }
+
+  /* 统计卡片行 */
+  .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .stat-card { background:var(--bg2); border-radius:var(--radius); padding:18px 20px; border:1px solid var(--border); }
+  .stat-card .label { font-size:12px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .stat-card .value { font-size:28px; font-weight:700; }
+  .stat-card .sub { font-size:12px; color:var(--text3); margin-top:4px; }
+  .stat-card .value.blue { color:var(--blue); }
+  .stat-card .value.green { color:var(--green); }
+  .stat-card .value.purple { color:var(--purple); }
+  .stat-card .value.amber { color:var(--amber); }
+
+  /* 区域切换 */
+  .tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--bg3); padding:4px; border-radius:var(--radius-sm); width:fit-content; }
+  .tab { padding:7px 18px; border-radius:var(--radius-sm); cursor:pointer; font-size:13px; border:none; background:none; color:var(--text2); font-weight:500; }
+  .tab.active { background:var(--bg2); color:var(--text); box-shadow:var(--shadow); }
+
+  /* 图表行 */
+  .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:24px; }
+  .chart-card { background:var(--bg2); border-radius:var(--radius); padding:18px; border:1px solid var(--border); }
+  .chart-card.full { grid-column:1/-1; }
+  .chart-title { font-size:13px; font-weight:600; color:var(--text2); margin-bottom:12px; }
+  .chart-wrap { position:relative; height:250px; }
+
+  /* 表格 */
+  .table-card { background:var(--bg2); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; margin-bottom:24px; }
+  .table-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); }
+  .table-hdr h3 { font-size:14px; font-weight:600; }
+  .table-ctrls { display:flex; gap:8px; }
+  .table-filter { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:var(--radius-sm); font-size:12px; width:180px; outline:none; }
+  .table-filter:focus { border-color:var(--blue); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { padding:10px 14px; text-align:left; font-weight:600; color:var(--text2); font-size:12px; background:var(--bg3); border-bottom:1px solid var(--border); white-space:nowrap; cursor:pointer; }
+  th:hover { color:var(--text); }
+  td { padding:9px 14px; border-bottom:1px solid rgba(51,65,85,0.4); white-space:nowrap; }
+  tr:hover td { background:rgba(59,130,246,0.05); }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; }
+  .tag-qi2 { background:var(--purple-bg); color:var(--purple); }
+  .tag-gan { background:var(--green-bg); color:var(--green); }
+  .tag-mag { background:var(--blue-bg); color:var(--blue); }
+  .rating-stars { color:var(--amber); font-size:14px; }
+  .price { font-weight:600; color:var(--green); }
+
+  /* 机会矩阵 */
+  .opp-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:24px; }
+  .opp-col { background:var(--bg2); border-radius:var(--radius); border:1px solid var(--border); padding:16px; }
+  .opp-col h4 { font-size:13px; font-weight:600; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .opp-item { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid rgba(51,65,85,0.3); }
+  .opp-prio { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; flex-shrink:0; font-size:11px; }
+  .opp-prio.p0 { background:var(--red); }
+  .opp-prio.p1 { background:var(--amber); }
+  .opp-prio.p2 { background:var(--blue); }
+  .opp-info { flex:1; }
+  .opp-info .title { font-size:13px; font-weight:500; }
+  .opp-info .desc { font-size:11px; color:var(--text3); margin-top:3px; }
+
+  /* 采集控制面板 */
+  .coll-panel { background:var(--bg2); border-radius:var(--radius); border:1px solid var(--border); padding:18px; margin-bottom:24px; display:none; }
+  .coll-panel.show { display:block; }
+  .coll-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-top:14px; }
+  .coll-card { background:var(--bg); border-radius:var(--radius-sm); padding:14px; border:1px solid var(--border); }
+  .coll-card .source-name { font-weight:600; font-size:13px; }
+  .coll-card .source-url { font-size:11px; color:var(--text3); margin-top:4px; word-break:break-all; }
+  .coll-card .source-meta { display:flex; gap:8px; margin-top:8px; font-size:11px; }
+
+  /* 加载动画 */
+  .loading { display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text3); }
+  .spinner { width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; margin-right:10px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .empty { text-align:center; padding:40px; color:var(--text3); }
+
+  /* Toast */
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 20px; box-shadow:var(--shadow); z-index:999; animation:slideUp 0.3s ease; display:none; }
+  .toast.show { display:block; }
+  .toast.success { border-color:var(--green); }
+  .toast.error { border-color:var(--red); }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  /* 响应式 */
+  @media(max-width:1024px) {
+    .stat-row { grid-template-columns:1fr 1fr; }
+    .chart-row { grid-template-columns:1fr; }
+    .opp-grid { grid-template-columns:1fr; }
+    .sidebar { width:60px; }
+    .nav-item span:not(.dot) { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">⚡ 竞品雷达</div>
+  <span class="badge">v1.0</span>
+  <div class="topbar-right">
+    <span id="statusText" style="font-size:12px;color:var(--text3);">就绪</span>
+    <button class="btn btn-outline btn-sm" onclick="toggleCollectPanel()">🔄 采集</button>
+    <button class="btn btn-outline btn-sm" onclick="refreshAll()">↻ 刷新</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-nav" id="sidebarNav">
+      <div class="nav-item active" data-cat="all">
+        <span class="dot" style="background:var(--blue);"></span>
+        <span>📊 总览</span>
+        <span class="count" id="countAll">-</span>
+      </div>
+      <div class="nav-item" data-cat="powerbank">
+        <span class="dot" style="background:var(--amber);"></span>
+        <span>🔋 移动电源</span>
+        <span class="count" id="countPowerbank">-</span>
+      </div>
+      <div class="nav-item" data-cat="wireless_charger">
+        <span class="dot" style="background:var(--purple);"></span>
+        <span>📱 无线充电器</span>
+        <span class="count" id="countWc">-</span>
+      </div>
+      <div class="nav-item" data-cat="adapter_cable">
+        <span class="dot" style="background:var(--green);"></span>
+        <span>🔌 适配器&线</span>
+        <span class="count" id="countAc">-</span>
+      </div>
+      <div class="nav-item" data-cat="car_charger">
+        <span class="dot" style="background:var(--cyan);"></span>
+        <span>🚗 车充</span>
+        <span class="count" id="countCc">-</span>
+      </div>
+      <div class="nav-item" data-cat="desktop_charger">
+        <span class="dot" style="background:var(--red);"></span>
+        <span>🖥 桌面充</span>
+        <span class="count" id="countDc">-</span>
+      </div>
+      <div class="nav-item" data-cat="energy_storage">
+        <span class="dot" style="background:var(--amber);"></span>
+        <span>🏕 储能电源</span>
+        <span class="count" id="countEs">-</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="main" id="mainContent">
+    <!-- 统计卡片 -->
+    <div class="stat-row" id="statRow">
+      <div class="stat-card"><div class="label">竞品总数</div><div class="value blue" id="statTotal">-</div><div class="sub">全品类 · 双市场</div></div>
+      <div class="stat-card"><div class="label">监测品牌</div><div class="value purple" id="statBrands">-</div><div class="sub">覆盖主流品牌</div></div>
+      <div class="stat-card"><div class="label">均评分</div><div class="value amber" id="statRating">-</div><div class="sub">加权平均</div></div>
+      <div class="stat-card"><div class="label">Qi2 产品</div><div class="value green" id="statQi2">-</div><div class="sub">最新协议占比</div></div>
+    </div>
+
+    <!-- 区域切换 -->
+    <div class="tabs" id="regionTabs">
+      <button class="tab active" data-region="all">🌍 全部</button>
+      <button class="tab" data-region="EU">🇪🇺 欧洲</button>
+      <button class="tab" data-region="NA">🇺🇸 北美</button>
+    </div>
+
+    <!-- 图表 -->
+    <div class="chart-row">
+      <div class="chart-card"><div class="chart-title">品类分布</div><div class="chart-wrap"><canvas id="chartCategory"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">品牌竞品数量 Top 10</div><div class="chart-wrap"><canvas id="chartBrands"></canvas></div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card"><div class="chart-title">价格 vs 评分 分布</div><div class="chart-wrap"><canvas id="chartPriceRating"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">技术特性分布 (Qi2 / GaN / 无线)</div><div class="chart-wrap"><canvas id="chartTech"></canvas></div></div>
+    </div>
+
+    <!-- INIU 机会矩阵 -->
+    <div class="table-card">
+      <div class="table-hdr"><h3>🎯 INIU 新品机会矩阵</h3></div>
+      <div class="opp-grid" id="oppGrid">
+        <div class="opp-col">
+          <h4>🔴 P0 — 立即行动</h4>
+          <div class="opp-item"><div class="opp-prio p0">P0</div><div class="opp-info"><div class="title">Qi2.2 磁吸移动电源 10K</div><div class="desc">双市场必选项，$40-60 北美坑位，MagPro升级</div></div></div>
+          <div class="opp-item"><div class="opp-prio p0">P0</div><div class="opp-info"><div class="title">Costco 65W GaN Bundle</div><div class="desc">适配器+数据线套装，北美渠道入场券</div></div></div>
+        </div>
+        <div class="opp-col">
+          <h4>🟠 P1 — 季度内启动</h4>
+          <div class="opp-item"><div class="opp-prio p1">P1</div><div class="opp-info"><div class="title">Costco 3-in-1 Qi2 无线充</div><div class="desc">北美零售渠道敲门砖，适配器附送差异化</div></div></div>
+          <div class="opp-item"><div class="opp-prio p1">P1</div><div class="opp-info"><div class="title">45W 伸缩线车充</div><div class="desc">无强势品牌，低风险高回报</div></div></div>
+          <div class="opp-item"><div class="opp-prio p1">P1</div><div class="opp-info"><div class="title">100W+Qi2 桌面充</div><div class="desc">中段无线集成蓝海</div></div></div>
+        </div>
+        <div class="opp-col">
+          <h4>🔵 P2 — 战略储备</h4>
+          <div class="opp-item"><div class="opp-prio p2">P2</div><div class="opp-info"><div class="title">300W 欧洲旗舰桌面充</div><div class="desc">多口+屏幕，抢专业用户心智</div></div></div>
+          <div class="opp-item"><div class="opp-prio p2">P2</div><div class="opp-info"><div class="title">户外太阳能移动电源</div><div class="desc">中长期战略品类，先试探小容量</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 产品表格 -->
+    <div class="table-card">
+      <div class="table-hdr">
+        <h3 id="tableTitle">📋 竞品列表</h3>
+        <div class="table-ctrls">
+          <input class="table-filter" id="searchInput" placeholder="搜索品牌/产品名..." oninput="applyFilters()">
+          <select class="table-filter" id="sortSelect" style="width:120px;" onchange="applyFilters()">
+            <option value="rating">评分↓</option>
+            <option value="price_asc">价格↑</option>
+            <option value="price_desc">价格↓</option>
+            <option value="newest">最新</option>
+          </select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>品牌</th><th>产品名</th><th>品类</th><th>区域</th><th>价格</th><th>评分</th>
+              <th>容量</th><th>功率</th><th>Qi2</th><th>GaN</th><th>无线</th><th>来源</th>
+            </tr>
+          </thead>
+          <tbody id="productTableBody">
+            <tr><td colspan="12"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:10px 18px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text3);">
+        <span id="tableInfo">显示 0 / 0</span>
+        <div style="display:flex;gap:4px;" id="pagination"></div>
+      </div>
+    </div>
+
+    <!-- 采集控制面板 -->
+    <div class="coll-panel" id="collectPanel">
+      <div class="table-hdr">
+        <h3>🔄 数据采集控制台</h3>
+        <button class="btn btn-outline btn-sm" onclick="toggleCollectPanel()">✕ 关闭</button>
+      </div>
+      <p style="color:var(--text3);font-size:12px;margin-bottom:12px;">
+        当前支持 Amazon.de / Amazon.pl 等 EU 渠道。北美渠道需 API 配置。点击"触发采集"后将返回 URL 列表，由 AI Agent 执行抓取。
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <select class="table-filter" id="collCategory" style="width:150px;">
+          <option value="all">全部品类</option>
+          <option value="powerbank">移动电源</option>
+          <option value="wireless_charger">无线充电器</option>
+          <option value="adapter_cable">适配器&数据线</option>
+          <option value="car_charger">车充</option>
+          <option value="desktop_charger">桌面充</option>
+          <option value="energy_storage">储能电源</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="triggerCollection()">▶ 触发采集</button>
+        <button class="btn btn-outline btn-sm" onclick="loadCollectionUrls()">📋 查看 URL</button>
+      </div>
+      <div id="collectionUrls" class="coll-grid"></div>
+      <div style="margin-top:16px;">
+        <h4 style="font-size:12px;color:var(--text3);margin-bottom:8px;">最近采集日志</h4>
+        <div id="collectionLogs" style="font-size:12px;color:var(--text2);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 全局状态
+// ============================================================
+const API = '';
+let state = {
+  category: 'all',
+  region: 'all',
+  page: 0,
+  limit: 50,
+  allProducts: [],
+  totalCount: 0,
+  chartInstances: {},
+};
+
+// ============================================================
+// 初始化
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initNav();
+  initRegionTabs();
+  loadAll();
+});
+
+async function loadAll() {
+  await loadStats();
+  await loadProducts();
+  // products 加载完成后，散点图需要用 products 数据再渲染一次
+  renderPriceRating({});
+}
+
+function initNav() {
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      state.category = el.dataset.cat;
+      state.page = 0;
+      document.getElementById('tableTitle').textContent =
+        state.category === 'all' ? '📋 全部竞品列表' :
+        '📋 ' + (el.querySelector('span:nth-child(2)')?.textContent || '竞品列表');
+      loadProducts();
+      loadStats();
+    });
+  });
+}
+
+function initRegionTabs() {
+  document.querySelectorAll('#regionTabs .tab').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#regionTabs .tab').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      state.region = el.dataset.region;
+      state.page = 0;
+      loadProducts();
+      loadStats();
+    });
+  });
+}
+
+// ============================================================
+// API 调用
+// ============================================================
+async function apiGet(path) {
+  try {
+    const res = await fetch(API + path);
+    if (!res.ok) throw new Error(res.statusText);
+    return await res.json();
+  } catch (e) {
+    showToast('请求失败: ' + e.message, 'error');
+    return null;
+  }
+}
+
+async function apiPost(path, body) {
+  try {
+    const res = await fetch(API + path, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    return await res.json();
+  } catch (e) {
+    showToast('请求失败: ' + e.message, 'error');
+    return null;
+  }
+}
+
+// ============================================================
+// 加载数据
+// ============================================================
+async function loadStats() {
+  const data = await apiGet('/api/stats/overview');
+  if (!data) return;
+
+  document.getElementById('statTotal').textContent = data.overview?.total_products || 0;
+  document.getElementById('statBrands').textContent = data.overview?.total_brands || 0;
+  document.getElementById('statRating').textContent =
+    data.overview?.avg_rating ? data.overview.avg_rating.toFixed(1) : '-';
+  document.getElementById('statQi2').textContent = data.overview?.qi2_count || 0;
+
+  // 更新侧边栏计数
+  const byCat = data.by_category || [];
+  const catMap = {};
+  byCat.forEach(c => { catMap[c.slug] = c.count; });
+
+  const totalSum = byCat.reduce((s,c) => s + c.count, 0);
+  document.getElementById('countAll').textContent = totalSum;
+  document.getElementById('countPowerbank').textContent = catMap['powerbank'] || 0;
+  document.getElementById('countWc').textContent = catMap['wireless_charger'] || 0;
+  document.getElementById('countAc').textContent = catMap['adapter_cable'] || 0;
+  document.getElementById('countCc').textContent = catMap['car_charger'] || 0;
+  document.getElementById('countDc').textContent = catMap['desktop_charger'] || 0;
+  document.getElementById('countEs').textContent = catMap['energy_storage'] || 0;
+
+  // 渲染图表
+  renderCategoryChart(byCat);
+  renderBrandChart(data.top_brands || []);
+  renderTechChart(data);
+  renderPriceRating(data);
+}
+
+async function loadProducts() {
+  const body = document.getElementById('productTableBody');
+  body.innerHTML = '<tr><td colspan="12"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>';
+
+  let url = `/api/products?limit=200`;
+  if (state.category !== 'all') url += `&category=${state.category}`;
+  if (state.region !== 'all') url += `&region=${state.region}`;
+
+  const data = await apiGet(url);
+  if (!data) {
+    body.innerHTML = '<tr><td colspan="12"><div class="empty">加载失败，请确认后端已启动</div></td></tr>';
+    return;
+  }
+
+  state.allProducts = data.products || [];
+  state.totalCount = data.total || 0;
+
+  applyFilters();
+}
+
+function applyFilters() {
+  const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const sort = document.getElementById('sortSelect').value;
+
+  let filtered = [...state.allProducts];
+
+  // 搜索过滤
+  if (search) {
+    filtered = filtered.filter(p =>
+      (p.brand_name || '').toLowerCase().includes(search) ||
+      (p.name || '').toLowerCase().includes(search)
+    );
+  }
+
+  // 排序
+  switch (sort) {
+    case 'price_asc': filtered.sort((a,b) => (a.price||9999) - (b.price||9999)); break;
+    case 'price_desc': filtered.sort((a,b) => (b.price||0) - (a.price||0)); break;
+    case 'newest': filtered.sort((a,b) => (b.collected_at||'').localeCompare(a.collected_at||'')); break;
+    default: filtered.sort((a,b) => (b.rating||0) - (a.rating||0)); break;
+  }
+
+  // 分页
+  const total = filtered.length;
+  const start = state.page * state.limit;
+  const pageItems = filtered.slice(start, start + state.limit);
+
+  renderTable(pageItems, total, start);
+}
+
+function renderTable(products, total, start) {
+  const body = document.getElementById('productTableBody');
+  if (products.length === 0) {
+    body.innerHTML = '<tr><td colspan="12"><div class="empty">暂无数据 — 请先触发数据采集或导入竞品数据</div></td></tr>';
+    document.getElementById('tableInfo').textContent = '显示 0 / 0';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = products.map(p => {
+    const qi2Tag = p.has_qi2 ? '<span class="tag tag-qi2">Qi2</span>' : '';
+    const ganTag = p.has_gan ? '<span class="tag tag-gan">GaN</span>' : '';
+    const magTag = p.has_magsafe ? '<span class="tag tag-mag">Mag</span>' : '';
+    const wirelessIcon = p.has_wireless ? '✅' : '-';
+    const priceStr = p.price ? `<span class="price">${p.price_currency||''} ${p.price.toFixed(2)}</span>` : '-';
+    const ratingStr = p.rating ? `<span class="rating-stars">★ ${p.rating.toFixed(1)}</span>` : '-';
+    const capacity = p.capacity_mah ? `${(p.capacity_mah/1000).toFixed(0)}K mAh` : '-';
+    const wattage = p.wattage ? `${p.wattage}W` : '-';
+    const name = (p.name || '').length > 40 ? (p.name||'').substring(0,40)+'...' : (p.name||'');
+
+    return `<tr>
+      <td><strong>${p.brand_name || '-'}</strong></td>
+      <td title="${p.name || ''}">${name}</td>
+      <td style="font-size:12px;color:var(--text3)">${p.category_name || '-'}</td>
+      <td>${p.region_code || '-'}</td>
+      <td>${priceStr}</td>
+      <td>${ratingStr}</td>
+      <td>${capacity}</td>
+      <td>${wattage}</td>
+      <td>${qi2Tag}</td>
+      <td>${ganTag}</td>
+      <td>${wirelessIcon}</td>
+      <td style="font-size:11px;color:var(--text3)">${p.source || '-'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableInfo').textContent =
+    `显示 ${start+1}-${start+products.length} / 共 ${total} 条`;
+
+  // 分页按钮
+  const totalPages = Math.ceil(total / state.limit);
+  const pageEl = document.getElementById('pagination');
+  let pageHtml = '';
+  for (let i = 0; i < Math.min(totalPages, 10); i++) {
+    pageHtml += `<button class="btn btn-outline btn-sm" style="${i===state.page?'background:var(--blue);color:#fff':''}"
+      onclick="state.page=${i};applyFilters()">${i+1}</button>`;
+  }
+  pageEl.innerHTML = pageHtml;
+}
+
+// ============================================================
+// 图表渲染
+// ============================================================
+function renderCategoryChart(byCat) {
+  const ctx = document.getElementById('chartCategory');
+  if (!ctx) return;
+  if (state.chartInstances.cat) state.chartInstances.cat.destroy();
+  if (typeof Chart === 'undefined') { drawChartFallback(ctx, '品类分布'); return; }
+  try {
+    state.chartInstances.cat = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: byCat.map(c => c.name_zh),
+        datasets: [{
+          data: byCat.map(c => c.count),
+          backgroundColor: ['#f59e0b','#8b5cf6','#10b981','#06b6d4','#ef4444','#f97316'],
+          borderColor: '#1e293b',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position:'right', labels:{ color:'#94a3b8', padding:12, font:{size:11} } } }
+      }
+    });
+  } catch(e) { console.error('品类图渲染失败:', e); }
+}
+
+function renderBrandChart(topBrands) {
+  const ctx = document.getElementById('chartBrands');
+  if (!ctx) return;
+  if (state.chartInstances.brand) state.chartInstances.brand.destroy();
+  if (typeof Chart === 'undefined') { drawChartFallback(ctx, '品牌竞品数量 Top 10'); return; }
+  try {
+    state.chartInstances.brand = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: topBrands.map(b => b.brand_name),
+        datasets: [
+          { label:'产品数', data:topBrands.map(b=>b.count||b.product_count||0), backgroundColor:'#3b82f6', borderRadius:4 },
+          { label:'均评分', data:topBrands.map(b=>b.avg_rating||0), backgroundColor:'#f59e0b', borderRadius:4,
+            yAxisID:'y1' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          y: { ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} },
+          y1: { position:'right', min:0, max:5, ticks:{color:'#94a3b8'}, grid:{display:false} },
+          x: { ticks:{color:'#94a3b8',font:{size:10}} }
+        },
+        plugins: { legend: { labels:{color:'#94a3b8',font:{size:10}} } }
+      }
+    });
+  } catch(e) { console.error('品牌图渲染失败:', e); }
+}
+
+function renderTechChart(data) {
+  const ctx = document.getElementById('chartTech');
+  if (!ctx) return;
+  if (state.chartInstances.tech) state.chartInstances.tech.destroy();
+  if (typeof Chart === 'undefined') { drawChartFallback(ctx, '技术特性分布'); return; }
+  const ov = data.overview || {};
+  try {
+    state.chartInstances.tech = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Qi2 协议', 'GaN 氮化镓', '无线充电'],
+        datasets: [{
+          label:'产品数', data:[
+            ov.qi2_count||0, ov.gan_count||0, ov.wireless_count||0
+          ],
+          backgroundColor: ['#8b5cf6','#10b981','#06b6d4'],
+          borderRadius:4
+        }]
+      },
+      options: {
+        indexAxis:'y',
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          x: { ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} },
+          y: { ticks:{color:'#94a3b8',font:{size:11}} }
+        },
+        plugins: { legend:{display:false} }
+      }
+    });
+  } catch(e) { console.error('技术图渲染失败:', e); }
+}
+
+// 评分 vs 价格散点图
+function renderPriceRating(data) {
+  const ctx = document.getElementById('chartPriceRating');
+  if (!ctx) return;
+  if (state.chartInstances.pr) state.chartInstances.pr.destroy();
+  if (typeof Chart === 'undefined') { drawChartFallback(ctx, '价格 vs 评分 分布'); return; }
+
+  const products = state.allProducts.length > 0 ? state.allProducts : (data.products || []);
+  const points = products
+    .filter(p => p.price && p.rating && p.price < 500)
+    .map(p => ({ x: p.price, y: p.rating }));
+
+  if (points.length === 0) return;
+
+  try {
+    state.chartInstances.pr = new Chart(ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label:'产品', data:points,
+          backgroundColor:'#3b82f6', pointRadius:5, pointHoverRadius:7,
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          x: { title:{display:true,text:'价格',color:'#94a3b8'}, ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} },
+          y: { title:{display:true,text:'评分',color:'#94a3b8'}, min:0, max:5, ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} }
+        },
+        plugins: { legend:{display:false} }
+      }
+    });
+  } catch(e) { console.error('散点图渲染失败:', e); }
+}
+
+// Chart.js 加载失败时的回退提示
+function drawChartFallback(canvas, title) {
+  const w = canvas.parentElement.clientWidth || 400;
+  const h = canvas.parentElement.clientHeight || 250;
+  canvas.width = w; canvas.height = h;
+  const ctx2d = canvas.getContext('2d');
+  if (!ctx2d) return;
+  ctx2d.fillStyle = '#1e293b';
+  ctx2d.fillRect(0, 0, w, h);
+  ctx2d.font = '14px sans-serif';
+  ctx2d.fillStyle = '#f59e0b';
+  ctx2d.textAlign = 'center';
+  ctx2d.fillText('⚠ Chart.js 未加载，请检查网络', w/2, h/2 - 10);
+  ctx2d.fillStyle = '#94a3b8';
+  ctx2d.font = '12px sans-serif';
+  ctx2d.fillText('(' + title + ')', w/2, h/2 + 14);
+}
+
+// ============================================================
+// 采集控制
+// ============================================================
+function toggleCollectPanel() {
+  document.getElementById('collectPanel').classList.toggle('show');
+  if (document.getElementById('collectPanel').classList.contains('show')) {
+    loadCollectionLogs();
+  }
+}
+
+async function loadCollectionUrls() {
+  const data = await apiGet('/api/collection/urls');
+  const container = document.getElementById('collectionUrls');
+  if (!data || !data.sources) {
+    container.innerHTML = '<div class="empty">获取 URL 列表失败</div>';
+    return;
+  }
+  container.innerHTML = data.sources.map(s => `
+    <div class="coll-card">
+      <div class="source-name">${s.source} · ${s.country}</div>
+      <div class="source-url">${s.url.substring(0,80)}...</div>
+      <div class="source-meta">
+        <span class="tag tag-qi2">${s.category}</span>
+        <span style="color:var(--text3)">${s.currency}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function triggerCollection() {
+  const category = document.getElementById('collCategory').value;
+  showToast('正在创建采集任务...', 'success');
+  const data = await apiPost('/api/collection/trigger', { category, region:'EU' });
+  if (data) {
+    showToast(`已创建 ${data.task_count} 个采集任务`, 'success');
+    document.getElementById('statusText').textContent = `${data.task_count} 任务待采集`;
+    loadCollectionLogs();
+  }
+}
+
+async function loadCollectionLogs() {
+  const data = await apiGet('/api/collection/logs');
+  const el = document.getElementById('collectionLogs');
+  if (!data || data.length === 0) {
+    el.innerHTML = '<span style="color:var(--text3)">暂无采集记录</span>';
+    return;
+  }
+  el.innerHTML = data.slice(0,10).map(l => `
+    <div style="padding:4px 0;border-bottom:1px solid var(--border);">
+      <span class="tag ${l.status==='success'?'tag-gan':l.status==='failed'?'tag tag-qi2':'tag-mag'}">${l.status}</span>
+      <span style="margin-left:8px;">${l.source||''} · ${l.category_name||''}</span>
+      <span style="margin-left:8px;color:var(--text3);">${l.sku_count||0} SKU · ${l.new_sku_count||0} 新增</span>
+      <span style="float:right;color:var(--text3);">${(l.created_at||'').substring(0,16)}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// 刷新
+// ============================================================
+async function refreshAll() {
+  document.getElementById('statusText').textContent = '刷新中...';
+  await loadStats();
+  await loadProducts();
+  document.getElementById('statusText').textContent = '已更新';
+  setTimeout(() => { document.getElementById('statusText').textContent = '就绪'; }, 2000);
+}
+
+// ============================================================
+// Toast
+// ============================================================
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+
+</body>
+</html>
