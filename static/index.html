@@ -90,6 +90,11 @@
   .tag-mag { background:var(--blue-bg); color:var(--blue); }
   .rating-stars { color:var(--amber); font-size:14px; }
   .price { font-weight:600; color:var(--green); }
+  .prod-img { width:44px; height:44px; object-fit:contain; border-radius:4px; background:var(--bg3); }
+  .prod-img-placeholder { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--bg3); border-radius:4px; font-size:16px; font-weight:700; color:var(--text2); }
+  .prod-link { color:var(--blue); text-decoration:none; cursor:pointer; }
+  .prod-link:hover { text-decoration:underline; color:#60a5fa; }
+  .prod-name-cell { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; }
 
   /* 机会矩阵 */
   .opp-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:24px; }
@@ -259,12 +264,12 @@
         <table>
           <thead>
             <tr>
-              <th>品牌</th><th>产品名</th><th>品类</th><th>区域</th><th>价格</th><th>评分</th>
+              <th style="width:52px;">图片</th><th>品牌</th><th>产品名</th><th>品类</th><th>区域</th><th>价格</th><th>评分</th>
               <th>容量</th><th>功率</th><th>Qi2</th><th>GaN</th><th>无线</th><th>来源</th>
             </tr>
           </thead>
           <tbody id="productTableBody">
-            <tr><td colspan="12"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>
+            <tr><td colspan="13"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -432,7 +437,7 @@ async function loadStats() {
 
 async function loadProducts() {
   const body = document.getElementById('productTableBody');
-  body.innerHTML = '<tr><td colspan="12"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>';
+  body.innerHTML = '<tr><td colspan="13"><div class="loading"><div class="spinner"></div>加载中...</div></td></tr>';
 
   let url = `/api/products?limit=200`;
   if (state.category !== 'all') url += `&category=${state.category}`;
@@ -440,7 +445,7 @@ async function loadProducts() {
 
   const data = await apiGet(url);
   if (!data) {
-    body.innerHTML = '<tr><td colspan="12"><div class="empty">加载失败，请确认后端已启动</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="13"><div class="empty">加载失败，请确认后端已启动</div></td></tr>';
     return;
   }
 
@@ -483,7 +488,7 @@ function applyFilters() {
 function renderTable(products, total, start) {
   const body = document.getElementById('productTableBody');
   if (products.length === 0) {
-    body.innerHTML = '<tr><td colspan="12"><div class="empty">暂无数据 — 请先触发数据采集或导入竞品数据</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="13"><div class="empty">暂无数据 — 请先触发数据采集或导入竞品数据</div></td></tr>';
     document.getElementById('tableInfo').textContent = '显示 0 / 0';
     document.getElementById('pagination').innerHTML = '';
     return;
@@ -498,11 +503,25 @@ function renderTable(products, total, start) {
     const ratingStr = p.rating ? `<span class="rating-stars">★ ${p.rating.toFixed(1)}</span>` : '-';
     const capacity = p.capacity_mah ? `${(p.capacity_mah/1000).toFixed(0)}K mAh` : '-';
     const wattage = p.wattage ? `${p.wattage}W` : '-';
-    const name = (p.name || '').length > 40 ? (p.name||'').substring(0,40)+'...' : (p.name||'');
+    const name = (p.name || '').length > 45 ? (p.name||'').substring(0,45)+'...' : (p.name||'');
+    // 图片: 有则显示缩略图，无则显示品牌首字母占位符
+    const brandInit = (p.brand_name || '?')[0].toUpperCase();
+    // 根据首字母生成柔和色调
+    const hue = (brandInit.charCodeAt(0) * 27) % 360;
+    const phBg = `hsl(${hue}, 15%, 18%)`;
+    const phColor = `hsl(${hue}, 40%, 65%)`;
+    const imgHtml = p.image_url
+      ? `<img src="${p.image_url}" class="prod-img" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt=""><span class="prod-img-placeholder" style="display:none;background:${phBg};color:${phColor}">${brandInit}</span>`
+      : `<span class="prod-img-placeholder" style="background:${phBg};color:${phColor}">${brandInit}</span>`;
+    // 产品名: 有链接则可点击
+    const nameHtml = p.source_url
+      ? `<a href="${p.source_url}" target="_blank" rel="noopener" class="prod-link" title="打开产品页"><span class="prod-name-cell">${name}</span></a>`
+      : `<span class="prod-name-cell" title="${p.name||''}">${name}</span>`;
 
     return `<tr>
+      <td>${imgHtml}</td>
       <td><strong>${p.brand_name || '-'}</strong></td>
-      <td title="${p.name || ''}">${name}</td>
+      <td>${nameHtml}</td>
       <td style="font-size:12px;color:var(--text3)">${p.category_name || '-'}</td>
       <td>${p.region_code || '-'}</td>
       <td>${priceStr}</td>

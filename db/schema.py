@@ -62,6 +62,7 @@ def init_db():
             region_id INTEGER REFERENCES regions(id),
             source TEXT,                     -- 'amazon.de' | 'bestbuy.com' | ...
             source_url TEXT,
+            image_url TEXT,
             -- 价格
             price REAL,
             price_currency TEXT,
